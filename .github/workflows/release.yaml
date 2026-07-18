@@ -105,7 +105,8 @@ jobs:
 
       - name: Cross-compile OpenSSL for Android arm64
         run: |
-          export PATH=${{ env.NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          export ANDROID_NDK_ROOT=${{ env.NDK_ROOT }}
+          export PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
           git clone --depth 1 -b openssl-3.3 \
             https://github.com/openssl/openssl.git /tmp/openssl-src
           cd /tmp/openssl-src
