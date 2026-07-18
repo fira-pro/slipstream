@@ -54,6 +54,7 @@ typedef struct st_slipstream_client_ctx_t {
 
 char* client_domain_name = NULL;
 size_t client_domain_name_len = 0;
+static int client_dns_max_size = 1232;
 
 ssize_t client_encode_segment(dns_packet_t* packet, size_t* packet_len, const unsigned char* src_buf, size_t src_buf_len) {
     char name[255];
@@ -75,7 +76,7 @@ ssize_t client_encode_segment(dns_packet_t* packet, size_t* packet_len, const un
     edns.opt.type = RR_OPT;
     edns.opt.class = CLASS_UNKNOWN;
     edns.opt.ttl = 0;
-    edns.opt.udp_payload = 1232;
+    edns.opt.udp_payload = (uint16_t)client_dns_max_size;
 
     dns_query_t query = {0};
     query.id = rand() % UINT16_MAX;
@@ -698,16 +699,25 @@ static int slipstream_connect(struct sockaddr_storage* server_address,
     return ret;
 }
 
-int picoquic_slipstream_client(int listen_port, struct st_address_t* server_addresses, size_t server_address_count, const char* domain_name, const char* cc_algo_id, bool gso, const size_t keep_alive_interval) {
+int picoquic_slipstream_client(int listen_port, struct st_address_t* server_addresses, size_t server_address_count, const char* domain_name, const char* cc_algo_id, bool gso, const size_t keep_alive_interval, int dns_max_size) {
     /* Start: start the QUIC process */
     int ret = 0;
     uint64_t current_time = 0;
 
     client_domain_name = strdup(domain_name);
     client_domain_name_len = strlen(domain_name);
+    client_dns_max_size = dns_max_size;
 
-    double mtu_d = 240 - (double) client_domain_name_len;
-    mtu_d = mtu_d / 1.6;
+    /* The client QUIC MTU is primarily constrained by the 255-byte DNS name limit
+     * (base32-encoded QUIC data sits in the query subdomain).
+     * We also apply the dns_max_size packet limit as a secondary bound:
+     *   wire_name ≈ text_name_len + 2, query overhead ≈ 31 bytes
+     *   → max text from packet: dns_max_size - 33
+     * Take the smaller of the name-length and packet-size constraints, then subtract
+     * the domain suffix and convert from base32 chars back to raw bytes (÷1.6). */
+    double name_limit = 240.0 - (double) client_domain_name_len;
+    double packet_limit = (double)(dns_max_size - 33) - (double) client_domain_name_len - 2.0;
+    double mtu_d = (name_limit < packet_limit ? name_limit : packet_limit) / 1.6;
     int mtu = (int) mtu_d;
 
     /* Create config */

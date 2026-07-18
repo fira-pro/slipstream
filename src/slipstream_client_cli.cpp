@@ -14,6 +14,7 @@ struct ClientArgs : MainArguments<ClientArgs> {
     bool gso = option('g', "GSO enabled (true/false) (default: false). Use --gso or --gso=true to enable.");
     std::string domain = option("domain", 'd', "Domain name used for the covert channel (Required)");
     int keep_alive_interval = option("keep-alive-interval", 't', "Send keep alive pings at this interval (default: 400, disabled: 0)") = 400;
+    int dns_max_size = option("dns-max-size", 'm', "Maximum DNS message size in bytes (default: 1232). Set to 512 for resolvers that cap DNS packet size.") = 1232;
 
     static std::string help(const std::string& program_name) {
         return "slipstream-client - A high-performance covert channel over DNS (client)\n\n" 
@@ -114,7 +115,8 @@ int main(int argc, char** argv) {
         (char*)args.domain.c_str(),
         (char*)args.congestion_control.c_str(),
         args.gso,
-        args.keep_alive_interval
+        args.keep_alive_interval,
+        args.dns_max_size
     );
 
 #ifdef _WINDOWS

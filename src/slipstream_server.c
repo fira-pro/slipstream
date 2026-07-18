@@ -693,7 +693,7 @@ int slipstream_server_callback(picoquic_cnx_t* cnx,
 }
 
 int picoquic_slipstream_server(int server_port, bool listen_ipv6, const char* server_cert, const char* server_key,
-                               struct sockaddr_storage* target_address, const char* domain_name) {
+                               struct sockaddr_storage* target_address, const char* domain_name, int dns_max_size) {
     /* Start: start the QUIC process with cert and key files */
     int ret = 0;
     uint64_t current_time = 0;
@@ -705,8 +705,19 @@ int picoquic_slipstream_server(int server_port, bool listen_ipv6, const char* se
     server_domain_name = strdup(domain_name);
     server_domain_name_len = strlen(domain_name);
 
-    // int mtu = 250;
-    int mtu = 900;
+    /* Server response MTU: the QUIC data goes into a DNS TXT answer record.
+     * Worst-case response overhead:
+     *   DNS header:          12 bytes
+     *   Question echo (max): 255 (name wire) + 4 (type+class) = 259 bytes
+     *   Answer section hdrs: 2 (name ptr) + 2 (type) + 2 (class) + 4 (ttl)
+     *                      + 2 (rdlen) + 1 (txt string len) = 13 bytes
+     *   EDNS OPT record:     15 bytes
+     *   Total overhead:      ~300 bytes (conservative)
+     * Any remaining space can hold raw QUIC bytes. */
+    int response_overhead = 300;
+    int mtu = dns_max_size - response_overhead;
+    if (mtu < 50)  mtu = 50;   /* absolute floor to keep QUIC functional */
+    if (mtu > 900) mtu = 900;  /* cap at original ceiling */
 
     /* Create config */
     picoquic_quic_config_t config;

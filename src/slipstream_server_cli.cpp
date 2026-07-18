@@ -13,6 +13,7 @@ struct ServerArgs : MainArguments<ServerArgs> {
     std::string target_address = option("target-address", 'a', "Target server address (default: 127.0.0.1:5201)") = "127.0.0.1:5201";    std::string cert = option("cert", 'c', "Certificate file path (default: certs/cert.pem)") = "certs/cert.pem";
     std::string key = option("key", 'k', "Private key file path (default: certs/key.pem)") = "certs/key.pem";
     std::string domain = option("domain", 'd', "Domain name this server is authoritative for (Required)");
+    int dns_max_size = option("dns-max-size", 'm', "Maximum DNS message size in bytes (default: 1232). Set to 512 for resolvers that cap DNS packet size.") = 1232;
 
     static std::string help(const std::string& program_name) {
         return "slipstream-server - A high-performance covert channel over DNS (server)\n\n" 
@@ -74,7 +75,8 @@ int main(int argc, char** argv) {
         (char*)args.cert.c_str(),
         (char*)args.key.c_str(),
         &target_address,
-        (char*)args.domain.c_str()
+        (char*)args.domain.c_str(),
+        args.dns_max_size
     );
 
 #ifdef _WINDOWS
