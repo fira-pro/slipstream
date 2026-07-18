@@ -40,13 +40,18 @@ include_dirs = include_directories('include', extern, quick_args, spcdns, lua_re
 # Default linker arguments
 link_args = []
 
-# Set up static links
+# Set up static links — flags differ between GCC toolchains and the Android NDK (clang)
 is_static = get_option('default_library') == 'static'
 if is_static and host_machine.system() != 'darwin'
-  link_args = [
-    '-static-libgcc',
-    '-static-libstdc++',
-  ]
+  if host_machine.system() == 'android'
+    # NDK clang uses libc++; -static-libgcc is a GCC-only flag and must not be used here
+    link_args = ['-static-c++']
+  else
+    link_args = [
+      '-static-libgcc',
+      '-static-libstdc++',
+    ]
+  endif
 endif
 
 # Import the CMake module
@@ -97,10 +102,17 @@ picoquic_proj = cmake.subproject(
 )
 
 # Dependencies used by both executables
-slipstream_cli_deps = [
-  dependency('threads'), # for picoquic
-  picoquic_proj.dependency('picoquic-core'),
-]
+# On Android, pthreads is part of Bionic libc — no separate -lpthread link needed
+if host_machine.system() == 'android'
+  slipstream_cli_deps = [
+    picoquic_proj.dependency('picoquic-core'),
+  ]
+else
+  slipstream_cli_deps = [
+    dependency('threads'), # for picoquic
+    picoquic_proj.dependency('picoquic-core'),
+  ]
+endif
 # Link optional picoquic logging
 if loglib_enabled
   slipstream_cli_deps += picoquic_proj.dependency('picoquic-log')
