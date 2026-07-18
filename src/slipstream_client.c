@@ -292,19 +292,21 @@ void slipstream_add_paths(slipstream_client_ctx_t* client_ctx) {
         }
 
         uint64_t current_time = picoquic_current_time();
-        // if (current_time - cnx->start_time < 10000000) {
-        //     DBG_PRINTF("Can't add path yet", NULL);
-        //     continue;
-        // }
 
-        print_sockaddr_ip_and_port(&slipstream_path->server_address);
+        slipstream_path->probe_attempts++;
         int path_id = -2;
         picoquic_probe_new_path_ex(cnx, (struct sockaddr*)&slipstream_path->server_address, (struct sockaddr*)&cnx->path[0]->local_addr, 0, current_time, 0, &path_id);
         if (path_id < 0) {
-            DBG_PRINTF("Failed adding path", NULL);
+            /* Log first attempt and then every 500 to avoid spam while the
+             * connection is still negotiating multipath capabilities. */
+            if (slipstream_path->probe_attempts == 1 || slipstream_path->probe_attempts % 500 == 0) {
+                fprintf(stderr, "[multipath] path %zu: probe attempt %d returned path_id=%d (retrying)\n",
+                    i, slipstream_path->probe_attempts, path_id);
+            }
             continue;
         }
-        DBG_PRINTF("Added path", NULL);
+        fprintf(stdout, "[multipath] path %zu: probe succeeded (path_id=%d, attempts=%d)\n",
+            i, path_id, slipstream_path->probe_attempts);
 
         picoquic_reinsert_by_wake_time(cnx->quic, cnx, current_time);
         slipstream_path->added = true;

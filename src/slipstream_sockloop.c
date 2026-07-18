@@ -266,7 +266,11 @@ int slipstream_packet_loop_(picoquic_network_thread_ctx_t* thread_ctx, picoquic_
             struct sockaddr_storage peer_addr = {0};
             struct sockaddr_storage local_addr = {0};
             int if_index = param->dest_if;
-            int ret = picoquic_prepare_packet_ex(slot->cnx, -1, loop_time,
+            /* Send the poll on the SAME path where we received the response.
+             * Using path_id=-1 (any path) caused picoquic to always select the
+             * default path (resolver 1), starving resolver 2 of queries. */
+            int path_for_poll = (slot->path_id >= 0) ? slot->path_id : -1;
+            int ret = picoquic_prepare_packet_ex(slot->cnx, path_for_poll, loop_time,
                 send_buffer, send_buffer_size, &send_length,
                 &peer_addr, &local_addr, &if_index, send_msg_ptr);
             if (ret < 0) {

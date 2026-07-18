@@ -705,19 +705,37 @@ int picoquic_slipstream_server(int server_port, bool listen_ipv6, const char* se
     server_domain_name = strdup(domain_name);
     server_domain_name_len = strlen(domain_name);
 
-    /* Server response MTU: the QUIC data goes into a DNS TXT answer record.
-     * Worst-case response overhead:
-     *   DNS header:          12 bytes
-     *   Question echo (max): 255 (name wire) + 4 (type+class) = 259 bytes
-     *   Answer section hdrs: 2 (name ptr) + 2 (type) + 2 (class) + 4 (ttl)
-     *                      + 2 (rdlen) + 1 (txt string len) = 13 bytes
-     *   EDNS OPT record:     15 bytes
-     *   Total overhead:      ~300 bytes (conservative)
-     * Any remaining space can hold raw QUIC bytes. */
-    int response_overhead = 300;
+    /* Server response MTU: the QUIC data goes in the TXT record of each DNS response.
+     *
+     * The dominant overhead is the echoed question name (the DNS spec requires responses
+     * to echo the full question section verbatim).  That name encodes the client's QUIC
+     * packet as base32 in the subdomain.  We can estimate its wire length from the domain:
+     *
+     *   client_mtu ≈ (240 - domain_len) / 1.6  bytes of raw QUIC data
+     *   encoded_chars ≈ client_mtu × 1.6 = (240 - domain_len)  base32 characters
+     *   name_dots = floor(encoded_chars / 57)          (one dot every 57 chars)
+     *   wire_name ≈ encoded_chars + name_dots + domain_len + 3
+     *             (label-length bytes replace dots + null terminator)
+     *
+     * Fixed overhead (same for every response):
+     *   DNS header:        12 bytes
+     *   question type+cls:  4 bytes
+     *   answer headers:    13 bytes  (2 name-ptr + 2 type + 2 class + 4 TTL + 2 rdlen + 1 TXT len)
+     *   EDNS OPT:          11 bytes  (1 root-name + 2 type + 2 class + 4 TTL + 2 rdlen)
+     *   Fixed subtotal:    40 bytes
+     *
+     * For "test.com" (8 chars): encoded_chars=232, dots=4, wire_name=247, overhead=287 → mtu=225
+     * For a 20-char domain:    encoded_chars=220, dots=3, wire_name=246, overhead=286 → mtu=226
+     */
+    double encoded_chars = 240.0 - (double)server_domain_name_len;
+    int name_dots = (int)(encoded_chars / 57.0);
+    int wire_name = (int)encoded_chars + name_dots + (int)server_domain_name_len + 3;
+    int response_overhead = 40 + wire_name;
     int mtu = dns_max_size - response_overhead;
     if (mtu < 50)  mtu = 50;   /* absolute floor to keep QUIC functional */
     if (mtu > 900) mtu = 900;  /* cap at original ceiling */
+    fprintf(stdout, "[server] dns_max_size=%d, domain_len=%zu, wire_name=%d, overhead=%d, quic_mtu=%d\n",
+        dns_max_size, server_domain_name_len, wire_name, response_overhead, mtu);
 
     /* Create config */
     picoquic_quic_config_t config;

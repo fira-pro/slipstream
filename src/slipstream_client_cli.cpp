@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
     bool ipv4 = false;
     bool ipv6 = false;
     for (const auto& res_str : args.resolver) {
-        st_address_t addr;
+        st_address_t addr = {};  /* zero-initialise: ensures added=false, probe_attempts=0 */
         char server_name[256];
         int server_port = 53;
 

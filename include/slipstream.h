@@ -20,6 +20,7 @@ extern "C" {
 typedef struct st_address_t {
     struct sockaddr_storage server_address;
     bool added;
+    int probe_attempts;   /* number of times picoquic_probe_new_path_ex was called */
 } address_t;
 
 int picoquic_slipstream_client(int listen_port, struct st_address_t* server_addresses, size_t server_address_count, const char* domain_name,
