@@ -1,3 +1,12 @@
 # Enable picoquic-log
 option('build_loglib', type : 'boolean', value: false)
 
+# Android cross-compilation settings.
+# These are used when cross-compiling for Android (host_machine.system() == 'android')
+# to pass the NDK toolchain and OpenSSL locations down to picoquic's inner CMake build.
+option('android_ndk_root', type: 'string', value: '',
+  description: 'Android NDK root directory (e.g. /opt/android-ndk)')
+option('android_openssl_prefix', type: 'string', value: '',
+  description: 'OpenSSL install prefix for Android (e.g. /opt/openssl-android)')
+option('android_api', type: 'integer', value: 34,
+  description: 'Android API level for cross-compilation (default: 34)')

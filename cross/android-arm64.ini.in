@@ -13,7 +13,7 @@ cpp     = '@@NDK_BIN@@/aarch64-linux-android34-clang++'
 ar      = '@@NDK_BIN@@/llvm-ar'
 strip   = '@@NDK_BIN@@/llvm-strip'
 # pkg-config must be the HOST (x86-64) binary, not an Android one
-pkgconfig = 'pkg-config'
+pkg-config = 'pkg-config'
 
 [built-in options]
 # Pass OpenSSL headers and libs so that picoquic's CMake can find them.

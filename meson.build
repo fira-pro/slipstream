@@ -95,6 +95,35 @@ else
   )
 endif
 
+# When cross-compiling for Android, propagate the NDK toolchain and OpenSSL
+# paths to picoquic's inner CMake build via cmake.subproject_options().
+# Values come from Meson user options set on the meson setup command line:
+#   -Dandroid_ndk_root=/opt/android-ndk
+#   -Dandroid_openssl_prefix=/opt/openssl-android
+#   -Dandroid_api=34
+if host_machine.system() == 'android'
+  android_ndk = get_option('android_ndk_root')
+  android_ssl = get_option('android_openssl_prefix')
+  android_api = get_option('android_api').to_string()
+
+  if android_ndk != ''
+    picoquic_opts.add_cmake_defines([
+      {'CMAKE_TOOLCHAIN_FILE': android_ndk / 'build' / 'cmake' / 'android.toolchain.cmake'},
+      {'ANDROID_ABI': 'arm64-v8a'},
+      {'ANDROID_PLATFORM': 'android-' + android_api},
+    ])
+  endif
+
+  if android_ssl != ''
+    picoquic_opts.add_cmake_defines([
+      {'OPENSSL_ROOT_DIR': android_ssl},
+      {'OPENSSL_INCLUDE_DIR': android_ssl / 'include'},
+      {'OPENSSL_CRYPTO_LIBRARY': android_ssl / 'lib' / 'libcrypto.a'},
+      {'OPENSSL_SSL_LIBRARY': android_ssl / 'lib' / 'libssl.a'},
+    ])
+  endif
+endif
+
 # Reference picoquic as a CMake subproject
 picoquic_proj = cmake.subproject(
   'picoquic',
