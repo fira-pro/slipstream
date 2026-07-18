@@ -30,3 +30,12 @@ set(OpenSSL_FOUND          TRUE                                    CACHE INTERNA
 # 4. Lock architecture to armv8-a (prevents NDK from appending -march=armv7-a later)
 set(CMAKE_C_FLAGS   "-march=armv8-a" CACHE INTERNAL "" FORCE)
 set(CMAKE_CXX_FLAGS "-march=armv8-a" CACHE INTERNAL "" FORCE)
+
+# Brotli (certificate compression) is available on the host Ubuntu runner but
+# we have no brotli headers/libs cross-compiled for Android arm64.  Disabling
+# it here (before picoquic's CMakeLists.txt runs find_package(Brotli)) avoids
+# the '-DPICOTLS_USE_BROTLI=1' flag being emitted with no matching headers.
+# Belt-and-suspenders: pre-set all the variables CMake checks after find_package(Brotli).
+set(PICOTLS_USE_BROTLI OFF CACHE BOOL "Use brotli for certificate compression" FORCE)
+set(Brotli_FOUND  FALSE CACHE BOOL "" FORCE)
+set(BROTLI_FOUND  FALSE CACHE BOOL "" FORCE)

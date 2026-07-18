@@ -92,6 +92,10 @@ jobs:
             cmake git pkg-config ninja-build \
             gcc g++ python3-pip unzip wget
           pip3 install meson
+          # Remove host brotli headers so CMake's find_package(Brotli) finds nothing.
+          # Without this, picotls gets configured with -DPICOTLS_USE_BROTLI=1 using
+          # host headers, which then fail to compile against the Android arm64 target.
+          sudo apt-get remove -y libbrotli-dev 2>/dev/null || true
 
       - name: Install Android NDK
         run: |
