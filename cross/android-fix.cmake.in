@@ -1,0 +1,32 @@
+# Android CMake toolchain fix file — generated from cross/android-fix.cmake.in by CI.
+# @@NDK_ROOT@@, @@OPENSSL_PREFIX@@, and @@API@@ are substituted by sed at build time.
+#
+# This file is set as CMAKE_TOOLCHAIN_FILE for ALL inner CMake builds (picoquic,
+# picotls, etc.) via the Meson cross-file's cmake_toolchain_file property.
+# It wraps the real NDK toolchain and injects OpenSSL paths so that picoquic's
+# find_package(OpenSSL) resolves to our cross-compiled static build.
+
+# Suppress "overriding cache variable" warnings
+cmake_policy(SET CMP0126 NEW)
+
+# 1. Force Android settings BEFORE including the NDK toolchain (NDK reads these)
+set(ANDROID_ABI       "arm64-v8a"       CACHE STRING "" FORCE)
+set(ANDROID_PLATFORM  "android-@@API@@" CACHE STRING "" FORCE)
+set(ANDROID_STL       "c++_static"      CACHE STRING "" FORCE)
+set(ANDROID_ARM_MODE  "arm"             CACHE STRING "" FORCE)
+
+# 2. Include the real NDK toolchain — this sets CMAKE_C_COMPILER etc.
+include("@@NDK_ROOT@@/build/cmake/android.toolchain.cmake")
+
+# 3. Inject our cross-compiled OpenSSL so picoquic/picotls find_package(OpenSSL) succeeds.
+#    Using CACHE INTERNAL so these values take priority over any find_package search.
+set(OPENSSL_ROOT_DIR       "@@OPENSSL_PREFIX@@"                    CACHE INTERNAL "")
+set(OPENSSL_INCLUDE_DIR    "@@OPENSSL_PREFIX@@/include"            CACHE INTERNAL "")
+set(OPENSSL_CRYPTO_LIBRARY "@@OPENSSL_PREFIX@@/lib/libcrypto.a"   CACHE INTERNAL "")
+set(OPENSSL_SSL_LIBRARY    "@@OPENSSL_PREFIX@@/lib/libssl.a"       CACHE INTERNAL "")
+set(OPENSSL_FOUND          TRUE                                    CACHE INTERNAL "")
+set(OpenSSL_FOUND          TRUE                                    CACHE INTERNAL "")
+
+# 4. Lock architecture to armv8-a (prevents NDK from appending -march=armv7-a later)
+set(CMAKE_C_FLAGS   "-march=armv8-a" CACHE INTERNAL "" FORCE)
+set(CMAKE_CXX_FLAGS "-march=armv8-a" CACHE INTERNAL "" FORCE)

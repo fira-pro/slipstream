@@ -40,18 +40,16 @@ include_dirs = include_directories('include', extern, quick_args, spcdns, lua_re
 # Default linker arguments
 link_args = []
 
-# Set up static links — flags differ between GCC toolchains and the Android NDK (clang)
+# Set up static links — flags differ between GCC toolchains and the Android NDK (clang).
+# For Android: the C++ runtime is wired by ANDROID_STL=c++_static in the CMake toolchain
+# file; cpp_link_args in the Meson cross-file handles the final link step.  No extra
+# link_args needed here.
 is_static = get_option('default_library') == 'static'
-if is_static and host_machine.system() != 'darwin'
-  if host_machine.system() == 'android'
-    # NDK clang uses libc++; -static-libgcc is a GCC-only flag and must not be used here
-    link_args = ['-static-c++']
-  else
-    link_args = [
-      '-static-libgcc',
-      '-static-libstdc++',
-    ]
-  endif
+if is_static and host_machine.system() != 'darwin' and host_machine.system() != 'android'
+  link_args = [
+    '-static-libgcc',
+    '-static-libstdc++',
+  ]
 endif
 
 # Import the CMake module
@@ -95,34 +93,10 @@ else
   )
 endif
 
-# When cross-compiling for Android, propagate the NDK toolchain and OpenSSL
-# paths to picoquic's inner CMake build via cmake.subproject_options().
-# Values come from Meson user options set on the meson setup command line:
-#   -Dandroid_ndk_root=/opt/android-ndk
-#   -Dandroid_openssl_prefix=/opt/openssl-android
-#   -Dandroid_api=34
-if host_machine.system() == 'android'
-  android_ndk = get_option('android_ndk_root')
-  android_ssl = get_option('android_openssl_prefix')
-  android_api = get_option('android_api').to_string()
-
-  if android_ndk != ''
-    picoquic_opts.add_cmake_defines([
-      {'CMAKE_TOOLCHAIN_FILE': android_ndk / 'build' / 'cmake' / 'android.toolchain.cmake'},
-      {'ANDROID_ABI': 'arm64-v8a'},
-      {'ANDROID_PLATFORM': 'android-' + android_api},
-    ])
-  endif
-
-  if android_ssl != ''
-    picoquic_opts.add_cmake_defines([
-      {'OPENSSL_ROOT_DIR': android_ssl},
-      {'OPENSSL_INCLUDE_DIR': android_ssl / 'include'},
-      {'OPENSSL_CRYPTO_LIBRARY': android_ssl / 'lib' / 'libcrypto.a'},
-      {'OPENSSL_SSL_LIBRARY': android_ssl / 'lib' / 'libssl.a'},
-    ])
-  endif
-endif
+# Note: when cross-compiling for Android all CMake-level settings (toolchain file,
+# ANDROID_ABI, ANDROID_STL, OpenSSL paths, etc.) are injected via the CMake toolchain
+# fix file referenced by cmake_toolchain_file in the Meson cross-file [properties].
+# No add_cmake_defines calls needed here for Android.
 
 # Reference picoquic as a CMake subproject
 picoquic_proj = cmake.subproject(

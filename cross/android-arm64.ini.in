@@ -1,30 +1,38 @@
 # Meson cross-compilation file for Android arm64 (AArch64) using the Android NDK.
+# This file is a template — @@NDK_BIN@@ and @@API@@ are substituted by sed in CI
+# before being passed to `meson setup --cross-file`.
 #
-# NDK_BIN and OPENSSL_ANDROID_PREFIX are substituted by the CI workflow using sed
-# before this file is passed to `meson setup --cross-file`.
-#
-# Placeholders (replaced by workflow):
-#   @@NDK_BIN@@          - absolute path to the NDK prebuilt LLVM bin dir
-#   @@OPENSSL_PREFIX@@   - absolute path to the cross-compiled OpenSSL installation
+# The actual NDK toolchain + OpenSSL wiring is done via android-fix.cmake
+# (referenced by cmake_toolchain_file below), which is also generated from a
+# template with the real NDK and OpenSSL paths substituted in.
 
 [binaries]
-c       = '@@NDK_BIN@@/aarch64-linux-android34-clang'
-cpp     = '@@NDK_BIN@@/aarch64-linux-android34-clang++'
-ar      = '@@NDK_BIN@@/llvm-ar'
-strip   = '@@NDK_BIN@@/llvm-strip'
-# pkg-config must be the HOST (x86-64) binary, not an Android one
-pkg-config = 'pkg-config'
+c          = '@@NDK_BIN@@/aarch64-linux-android@@API@@-clang'
+cpp        = '@@NDK_BIN@@/aarch64-linux-android@@API@@-clang++'
+ar         = '@@NDK_BIN@@/llvm-ar'
+strip      = '@@NDK_BIN@@/llvm-strip'
+nm         = '@@NDK_BIN@@/llvm-nm'
+pkg-config = '/bin/false'
+# cmake must be listed here explicitly — in cross-build mode Meson ignores
+# the host $PATH and only uses what is declared in this [binaries] section.
+cmake      = '/usr/bin/cmake'
+ninja      = '/usr/bin/ninja'
 
-[built-in options]
-# Pass OpenSSL headers and libs so that picoquic's CMake can find them.
-# We use the compiler flags route because there is no Android pkg-config database.
-c_args       = ['-I@@OPENSSL_PREFIX@@/include']
-cpp_args     = ['-I@@OPENSSL_PREFIX@@/include']
-c_link_args  = ['-L@@OPENSSL_PREFIX@@/lib', '-L@@OPENSSL_PREFIX@@/lib64']
-cpp_link_args = ['-L@@OPENSSL_PREFIX@@/lib', '-L@@OPENSSL_PREFIX@@/lib64']
+[properties]
+# cmake_toolchain_file in [properties] is the correct Meson mechanism to pass
+# -DCMAKE_TOOLCHAIN_FILE to all inner CMake subproject builds.
+# (Using add_cmake_defines({'CMAKE_TOOLCHAIN_FILE': ...}) in meson.build is
+#  explicitly unsupported and silently ignored by Meson — see meson warnings.)
+cmake_toolchain_file = '/tmp/android-fix.cmake'
+needs_exe_wrapper    = true
 
 [host_machine]
 system     = 'android'
 cpu_family = 'aarch64'
 cpu        = 'aarch64'
 endian     = 'little'
+
+[built-in options]
+# The C++ runtime is statically linked via ANDROID_STL=c++_static in the cmake
+# fix file.  Pass the compat flag here for Meson's own C++ linking step.
+cpp_link_args = ['-static-libstdc++']

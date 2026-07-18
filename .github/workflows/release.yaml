@@ -117,12 +117,23 @@ jobs:
           make -j$(nproc)
           make install_sw
 
-      - name: Generate Meson cross-file
+      - name: Generate Meson cross-file and CMake toolchain
         run: |
+          # Generate the cmake toolchain fix file first (has NDK_ROOT, OPENSSL_PREFIX, API)
+          sed \
+            -e "s|@@NDK_ROOT@@|${{ env.NDK_ROOT }}|g" \
+            -e "s|@@OPENSSL_PREFIX@@|${{ env.OPENSSL_PREFIX }}|g" \
+            -e "s|@@API@@|${{ env.API }}|g" \
+            cross/android-fix.cmake.in > /tmp/android-fix.cmake
+
+          # Generate the Meson cross-file (has NDK_BIN and API for binary names)
           sed \
             -e "s|@@NDK_BIN@@|${{ env.NDK_BIN }}|g" \
-            -e "s|@@OPENSSL_PREFIX@@|${{ env.OPENSSL_PREFIX }}|g" \
+            -e "s|@@API@@|${{ env.API }}|g" \
             cross/android-arm64.ini.in > /tmp/android-arm64.ini
+
+          echo "--- Generated cmake toolchain fix ---"
+          cat /tmp/android-fix.cmake
           echo "--- Generated cross-file ---"
           cat /tmp/android-arm64.ini
 
@@ -134,9 +145,6 @@ jobs:
             --warnlevel=0 \
             -Ddefault_library=static \
             -Db_lto=false \
-            -Dandroid_ndk_root=${{ env.NDK_ROOT }} \
-            -Dandroid_openssl_prefix=${{ env.OPENSSL_PREFIX }} \
-            -Dandroid_api=${{ env.API }} \
             meson-build-android
 
       - name: Build with Ninja
